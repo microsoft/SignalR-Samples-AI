@@ -16,7 +16,7 @@ namespace AIStreaming
             _store.TryRemove(connectionId, out _);
         }
 
-        public bool TryGetGroup(string connectionId, out string group)
+        public bool TryGetGroup(string connectionId, out string? group)
         {
             return _store.TryGetValue(connectionId, out group);
         }

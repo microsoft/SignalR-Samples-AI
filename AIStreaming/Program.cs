@@ -1,30 +1,23 @@
+using AIStreaming;
 using AIStreaming.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
-namespace AIStreaming
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-            builder.Services.AddControllersWithViews();
-            builder.Services.AddSignalR();
-            builder.Services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
-            builder.Services.AddSingleton<GroupAccessor>()
-                .AddSingleton<GroupHistoryStore>()
-                .AddAzureOpenAI(builder.Configuration);
+// Add services to the container.
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
+builder.Services.AddSingleton<GroupAccessor>()
+    .AddSingleton<GroupHistoryStore>()
+    .AddAzureOpenAI(builder.Configuration);
 
-            var app = builder.Build();
-            app.UseDefaultFiles();
-            app.UseStaticFiles();
+var app = builder.Build();
 
-            app.UseRouting();
+app.UseHttpsRedirection();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
-            app.MapHub<GroupChatHub>("/groupChat");
-            app.Run();
-        }
-    }
-}
+app.UseRouting();
+
+app.MapHub<GroupChatHub>("/groupChat");
+app.Run();
