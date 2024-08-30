@@ -47,7 +47,7 @@ function joinGroupWithName(groupName) {
     document.getElementById('chatGroupName').innerText = 'Group: ' + groupName;
     document.getElementById('chatPage').classList.remove('hidden');
 
-    connection = new signalR.HubConnectionBuilder().withUrl(`/groupChat?userId=${realUserName}`).withAutomaticReconnect().build();
+    connection = new signalR.HubConnectionBuilder().withUrl(`/groupChat`).withAutomaticReconnect().build();
     bindConnectionMessages(connection);
     connection.start().then(() => {
         updateConnectionStatus(true);
@@ -80,7 +80,7 @@ function sendMessage() {
     if (message) {
         appendMessage(true, message);
         document.getElementById('chatInput').value = '';
-        connection.send("Chat", message);
+        connection.send("Chat", realUserName, message);
     }
 }
 

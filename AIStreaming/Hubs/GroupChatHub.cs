@@ -26,19 +26,18 @@ namespace AIStreaming.Hubs
             _groupAccessor.Join(Context.ConnectionId, groupName);
         }
 
-        public override async Task OnDisconnectedAsync(Exception? exception)
+        public override Task OnDisconnectedAsync(Exception? exception)
         {
             _groupAccessor.Leave(Context.ConnectionId);
+            return Task.CompletedTask;
         }
 
-        public async Task Chat(string message)
+        public async Task Chat(string userName, string message)
         {
             if (!_groupAccessor.TryGetGroup(Context.ConnectionId, out var groupName))
             {
                 throw new InvalidOperationException("Not in a group.");
             }
-
-            var userName = Context.UserIdentifier ?? Context.ConnectionId;
 
             if (message.StartsWith("@gpt"))
             {
