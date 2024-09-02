@@ -62,11 +62,47 @@ builder.Services.AddSingleton<GroupAccessor>()
 
 ### 1. Group Chat
 
-When a user sends a message in the chat, it is broadcast to all other members of the group using SignalR. If the message does not contain the `@gpt` prefix, it is treated as a regular message, stored in the group’s chat history, and shared with all connected users.
+When a user sends a message in the chat, it is broadcast to all other members of the group using SignalR. If the message does not contain the `@gpt` prefix, it is treated as a regular message, stored in the group’s chat history, and use `Clients.OthersInGroup(groupName).SendAsync()` to send to all connected users.
 
 ### 2. AI Interaction and Streaming
 
-If a message begins with @gpt, the application interprets it as a request to involve the AI chatbot powered by OpenAI.
+If a message begins with @gpt, the application interprets it as a request to involve the AI chatbot powered by OpenAI. Below are some key details on how this interaction works.
+
+#### Roles in chat completion
+
+The OpenAI Chat Completions API supports three distinct roles for generating responses: assistant, user, and system.
+
+- The assistant role stores previous AI responses.
+- The user role contains requests or comments by users.
+- The system role sets the guidelines for how the AI should respond.
+
+In this project, the system role is pre-configured to instruct the AI to act as a group chat assistant. This configuration, located in the GroupHistoryStore.cs file, ensures the AI responds in a manner that is friendly, knowledgeable, and contextually relevant to the ongoing group conversation.
+
+```csharp
+new SystemChatMessage("You are a friendly and knowledgeable assistant participating in a group discussion." +
+                " Your role is to provide helpful, accurate, and concise information when addressed." +
+                " Maintain a respectful tone, ensure your responses are clear and relevant to the group's ongoing conversation, and assist in facilitating productive discussions." +
+                " Messages from users will be in the format 'UserName: chat messages'." +
+                " Pay attention to the 'UserName' to understand who is speaking and tailor your responses accordingly."),
+```
+
+All the messages from the user are in the `user` role, with the format `UserName: chat messages`.
+
+
+#### History content
+
+To enable the OpenAI model to generate context-aware responses, the chat history of the group is provided to the model. This history is managed by the GroupHistoryStore class, which maintains and updates the chat logs for each group.
+
+Both the user’s messages and the AI’s responses are stored in the chat history, with user messages labeled under the user role and AI responses under the assistant role. These history entries are then sent to the OpenAI model as a `IList<string>`.
+
+```csharp
+// GroupChatHub.cs
+chatClient.CompleteChatStreamingAsync(messagesIncludeHistory)
+```
+
+#### Workflow
+
+When a user sends a message starting with `@gpt`, the application sends the message together with the whole history to the OpenAI API for completion. The AI model generates a response based on the user's input and the group's chat history.
 
 The application uses the streaming capabilities of OpenAI to progressively send the AI's response back to the client as it is generated. The response is buffered and sent in chunks whenever the accumulated content exceeds a specific length, making the AI interaction feel more responsive.
 
