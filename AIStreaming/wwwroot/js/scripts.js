@@ -29,7 +29,7 @@ function submitName() {
 }
 
 function createGroup() {
-    const groupName = Math.random().toString(36).substr(2, 6);
+    const groupName = Math.random().toString(36).substring(2, 6);
     joinGroupWithName(groupName);
 }
 
@@ -72,7 +72,7 @@ function bindConnectionMessages(connection) {
 }
 
 function onConnected(connection) {
-    console.log('connection started');
+    console.log(`connection started: ${connection.state}`);
 }
 
 function sendMessage() {
