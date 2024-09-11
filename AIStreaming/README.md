@@ -86,8 +86,26 @@ new SystemChatMessage("You are a friendly and knowledgeable assistant participat
                 " Pay attention to the 'UserName' to understand who is speaking and tailor your responses accordingly."),
 ```
 
-All the messages from the user are in the `user` role, with the format `UserName: chat messages`.
+All the messages from the user are in the `user` role, with the format `UserName: chat messages`. As the following codes show, we use the predefined class `UserChatMessage` to create and store a user message.
 
+```csharp
+public IReadOnlyList<ChatMessage> GetOrAddGroupHistory(string groupName, string userName, string message)
+{
+    var chatMessages = _store.GetOrAdd(groupName, _ => InitiateChatMessages());
+    chatMessages.Add(new UserChatMessage(GenerateUserChatMessage(userName, message)));
+    return chatMessages.AsReadOnly();
+}
+```
+
+We also need to store the message coming from the AI in the `assistant` role. The following code snippet shows how we store the AI response in the `assistant` role. `AssistantChatMessage` is also a predefined class to represent a message from the AI.
+
+```csharp
+public void UpdateGroupHistoryForAssistant(string groupName, string message)
+{
+    var chatMessages = _store.GetOrAdd(groupName, _ => InitiateChatMessages());
+    chatMessages.Add(new AssistantChatMessage(message));
+}
+```
 
 #### History content
 

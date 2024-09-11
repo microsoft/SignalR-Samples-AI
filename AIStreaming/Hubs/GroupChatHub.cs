@@ -56,13 +56,13 @@ namespace AIStreaming.Hubs
                         totalCompletion.Append(content);
                         if (totalCompletion.Length - lastSentTokenLength > 20)
                         {
-                            await Clients.Group(groupName).SendAsync("newMessageWithId", "ChatGPT", id, totalCompletion.ToString());
+                            await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
                             lastSentTokenLength = totalCompletion.Length;
                         }
                     }
                 }
                 _history.UpdateGroupHistoryForAssistant(groupName, totalCompletion.ToString());
-                await Clients.Group(groupName).SendAsync("newMessageWithId", "ChatGPT", id, totalCompletion.ToString());
+                await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
             }
             else
             {
