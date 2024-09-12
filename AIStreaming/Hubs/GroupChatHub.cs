@@ -34,8 +34,7 @@ public sealed class GroupChatHub : Hub
 
     public async Task Chat(string userName, string message)
     {
-        if (!_groupAccessor.TryGetGroup(Context.ConnectionId, out var groupName) ||
-            groupName is null)
+        if (!_groupAccessor.TryGetGroup(Context.ConnectionId, out var groupName))
         {
             throw new InvalidOperationException("Not in a group.");
         }
@@ -57,13 +56,13 @@ public sealed class GroupChatHub : Hub
                     totalCompletion.Append(content);
                     if (totalCompletion.Length - lastSentTokenLength > 20)
                     {
-                        await Clients.Group(groupName).SendAsync("newMessageWithId", "ChatGPT", id, totalCompletion.ToString());
+                        await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
                         lastSentTokenLength = totalCompletion.Length;
                     }
                 }
             }
             _history.UpdateGroupHistoryForAssistant(groupName, totalCompletion.ToString());
-            await Clients.Group(groupName).SendAsync("newMessageWithId", "ChatGPT", id, totalCompletion.ToString());
+            await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
         }
         else
         {
