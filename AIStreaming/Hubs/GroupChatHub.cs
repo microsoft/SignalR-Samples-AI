@@ -3,72 +3,71 @@ using Microsoft.Extensions.Options;
 using OpenAI;
 using System.Text;
 
-namespace AIStreaming.Hubs
+namespace AIStreaming.Hubs;
+
+public sealed class GroupChatHub : Hub
 {
-    public class GroupChatHub : Hub
+    private readonly GroupAccessor _groupAccessor;
+    private readonly GroupHistoryStore _history;
+    private readonly OpenAIClient _openAI;
+    private readonly OpenAIOptions _options;
+
+    public GroupChatHub(GroupAccessor groupAccessor, GroupHistoryStore history, OpenAIClient openAI, IOptions<OpenAIOptions> options)
     {
-        private readonly GroupAccessor _groupAccessor;
-        private readonly GroupHistoryStore _history;
-        private readonly OpenAIClient _openAI;
-        private readonly OpenAIOptions _options;
+        _groupAccessor = groupAccessor ?? throw new ArgumentNullException(nameof(groupAccessor));
+        _history = history ?? throw new ArgumentNullException(nameof(history));
+        _openAI = openAI ?? throw new ArgumentNullException(nameof(openAI));
+        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+    }
 
-        public GroupChatHub(GroupAccessor groupAccessor, GroupHistoryStore history, OpenAIClient openAI, IOptions<OpenAIOptions> options)
+    public async Task JoinGroup(string groupName)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        _groupAccessor.Join(Context.ConnectionId, groupName);
+    }
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        _groupAccessor.Leave(Context.ConnectionId);
+        return Task.CompletedTask;
+    }
+
+    public async Task Chat(string userName, string message)
+    {
+        if (!_groupAccessor.TryGetGroup(Context.ConnectionId, out var groupName))
         {
-            _groupAccessor = groupAccessor ?? throw new ArgumentNullException(nameof(groupAccessor));
-            _history = history ?? throw new ArgumentNullException(nameof(history));
-            _openAI = openAI ?? throw new ArgumentNullException(nameof(openAI));
-            _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+            throw new InvalidOperationException("Not in a group.");
         }
 
-        public async Task JoinGroup(string groupName)
+        if (message.StartsWith("@gpt"))
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-            _groupAccessor.Join(Context.ConnectionId, groupName);
-        }
+            var id = Guid.NewGuid().ToString();
+            var actualMessage = message.Substring(4).Trim();
+            var messagesIncludeHistory = _history.GetOrAddGroupHistory(groupName, userName, actualMessage);
+            await Clients.OthersInGroup(groupName).SendAsync("NewMessage", userName, message);
 
-        public override Task OnDisconnectedAsync(Exception? exception)
-        {
-            _groupAccessor.Leave(Context.ConnectionId);
-            return Task.CompletedTask;
-        }
-
-        public async Task Chat(string userName, string message)
-        {
-            if (!_groupAccessor.TryGetGroup(Context.ConnectionId, out var groupName))
+            var chatClient = _openAI.GetChatClient(_options.Model);
+            var totalCompletion = new StringBuilder();
+            var lastSentTokenLength = 0;
+            await foreach (var completion in chatClient.CompleteChatStreamingAsync(messagesIncludeHistory))
             {
-                throw new InvalidOperationException("Not in a group.");
-            }
-
-            if (message.StartsWith("@gpt"))
-            {
-                var id = Guid.NewGuid().ToString();
-                var actualMessage = message.Substring(4).Trim();
-                var messagesIncludeHistory = _history.GetOrAddGroupHistory(groupName, userName, actualMessage);
-                await Clients.OthersInGroup(groupName).SendAsync("NewMessage", userName, message);
-
-                var chatClient = _openAI.GetChatClient(_options.Model);
-                var totalCompletion = new StringBuilder();
-                var lastSentTokenLength = 0;
-                await foreach (var completion in chatClient.CompleteChatStreamingAsync(messagesIncludeHistory))
+                foreach (var content in completion.ContentUpdate)
                 {
-                    foreach (var content in completion.ContentUpdate)
+                    totalCompletion.Append(content);
+                    if (totalCompletion.Length - lastSentTokenLength > 20)
                     {
-                        totalCompletion.Append(content);
-                        if (totalCompletion.Length - lastSentTokenLength > 20)
-                        {
-                            await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
-                            lastSentTokenLength = totalCompletion.Length;
-                        }
+                        await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
+                        lastSentTokenLength = totalCompletion.Length;
                     }
                 }
-                _history.UpdateGroupHistoryForAssistant(groupName, totalCompletion.ToString());
-                await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
             }
-            else
-            {
-                _history.GetOrAddGroupHistory(groupName, userName, message);
-                await Clients.OthersInGroup(groupName).SendAsync("NewMessage", userName, message);
-            }
+            _history.UpdateGroupHistoryForAssistant(groupName, totalCompletion.ToString());
+            await Clients.Group(groupName).SendAsync("newMessageWithId", "AI Assistant", id, totalCompletion.ToString());
+        }
+        else
+        {
+            _history.GetOrAddGroupHistory(groupName, userName, message);
+            await Clients.OthersInGroup(groupName).SendAsync("NewMessage", userName, message);
         }
     }
 }
