@@ -45,10 +45,17 @@ function joinGroup() {
 function joinGroupWithName(groupName) {
     document.getElementById('groupSelection').classList.add('hidden');
     document.getElementById('chatGroupName').innerText = 'Group: ' + groupName;
+    document.getElementById('chatUserName').innerText = 'User: ' + realUserName;
     document.getElementById('chatPage').classList.remove('hidden');
 
-    connection = new signalR.HubConnectionBuilder().withUrl(`/groupChat`).withAutomaticReconnect().build();
+    connection = new signalR
+        .HubConnectionBuilder()
+        .withUrl(`/groupChat`)
+        .withAutomaticReconnect()
+        .build();
+
     bindConnectionMessages(connection);
+
     connection.start().then(() => {
         updateConnectionStatus(true);
         onConnected(connection);

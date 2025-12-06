@@ -1,0 +1,60 @@
+﻿name: Continuous Integration ⚡
+run-name: "${{ github.actor }} - ${{ github.run_id }}"
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+
+env:
+  dotnetVersion: '10.x'
+  projectBaseDir: './src'
+  solutionFileName: 'AIStreaming.slnx'
+  mainProject: 'AIStreaming'
+  releaseMode: "Release"
+
+jobs:
+  build:
+    name: Build
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          sparse-checkout: |
+            src
+          sparse-checkout-cone-mode: false
+
+      - name: 🛠️ Setup .NET version ${{ env.dotnetVersion }}
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.dotnetVersion }}
+
+      - name: ✅ Check .NET version in use
+        run: |
+          echo "DOTNET_ROOT: $DOTNET_ROOT"
+          $DOTNET_ROOT/dotnet --info
+
+      - name: 📦 Restore NuGet packages
+        run: |
+          dotnet restore "${{ env.projectBaseDir }}/${{ env.solutionFileName }}"
+
+      - name: 🧱 Build solution in Release mode
+        run: |
+          dotnet build "${{ env.projectBaseDir }}/${{ env.solutionFileName }}" \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal
